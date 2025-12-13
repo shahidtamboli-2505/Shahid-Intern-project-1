@@ -1,29 +1,65 @@
 # backend/agent_logic_case1.py
+# Case 1 — GOOGLE PLACES ONLY pipeline
+
 from __future__ import annotations
+
 from typing import Dict, Any, Optional
 from datetime import datetime
 import os
 
 from backend.config import DEFAULT_LOCATION
-from backend.gpt_client import GPTClient
 from backend import scraper, miner, excel_utils
 
 
-def run_case1_pipeline(query: str, location: Optional[str] = None, use_gpt: bool = True) -> Dict[str, Any]:
+def run_case1_pipeline(
+    query: str,
+    location: Optional[str] = None,
+    place: str = "",
+    use_gpt: bool = False,   # ❌ GPT disabled by default
+) -> Dict[str, Any]:
     """
-    Case 1 ONLY pipeline:
-      scraper -> miner -> excel
+    GOOGLE PLACES ONLY pipeline:
+      scraper (google maps) -> miner -> excel
     """
-    location = location or DEFAULT_LOCATION
+
+    location = (location or DEFAULT_LOCATION).strip()
+    place = (place or "").strip()
+    query = (query or "").strip()
+
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    raw_records, raw_path = scraper.scrape_case1_to_raw(query=query, location=location, run_id=ts)
+    # -----------------------------
+    # 1️⃣ SCRAPE (Google Places only)
+    # -----------------------------
+    raw_records, raw_path = scraper.scrape_case1_to_raw(
+        query=query,
+        location=location,
+        place=place,
+        run_id=ts,
+        debug=True,   # 🔥 IMPORTANT: see GOOGLE logs in terminal
+    )
 
-    gpt = GPTClient() if use_gpt else None
-    cleaned_rows, stats = miner.mine_case1_records(raw_records=raw_records, gpt_client=gpt)
+    # -----------------------------
+    # 2️⃣ MINE / CLEAN
+    # -----------------------------
+    cleaned_rows, stats = miner.mine_case1_records(
+        raw_records=raw_records,
+        gpt_client=None,   # ❌ GPT not used
+    )
 
+    # -----------------------------
+    # 3️⃣ EXCEL EXPORT
+    # -----------------------------
     os.makedirs("data/output", exist_ok=True)
     excel_path = os.path.join("data/output", f"case1_{ts}.xlsx")
-    excel_utils.write_case1_excel(rows=cleaned_rows, out_path=excel_path)
 
-    return {"raw_path": raw_path, "excel_path": excel_path, "stats": stats}
+    excel_utils.write_case1_excel(
+        rows=cleaned_rows,
+        out_path=excel_path,
+    )
+
+    return {
+        "raw_path": raw_path,
+        "excel_path": excel_path,
+        "stats": stats,
+    }

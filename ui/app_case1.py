@@ -1,242 +1,218 @@
 # ui/app_case1.py
-import io
+import os
+import sys
+from datetime import datetime
 
 import pandas as pd
 import streamlit as st
 
-
 # -----------------------------
-# Demo data + demo excel helpers
+# Backend import (Case 1 only)
 # -----------------------------
-def load_demo_data() -> pd.DataFrame:
-    """Return a small sample DataFrame as a placeholder before backend integration."""
-    data = [
-        {
-            "Industry Name": "Shree Ganesh Precision Works",
-            "Category": "Manufacturing",
-            "Address": "MIDC Bhosari, Pune, Maharashtra",
-            "City": "Pune",
-            "Contact Number": "+91 98765 43210",
-            "Website": "https://example.com/ganesh-precision",
-        },
-        {
-            "Industry Name": "Apex Industrial Fabricators",
-            "Category": "Manufacturing",
-            "Address": "Chakan Industrial Area, Pune, Maharashtra",
-            "City": "Pune",
-            "Contact Number": "+91 91234 56789",
-            "Website": "https://example.com/apex-fabricators",
-        },
-        {
-            "Industry Name": "BlueLine Plastics Pvt. Ltd.",
-            "Category": "Manufacturing",
-            "Address": "Hinjewadi Phase 2, Pune, Maharashtra",
-            "City": "Pune",
-            "Contact Number": "+91 99887 77665",
-            "Website": "https://example.com/blueline-plastics",
-        },
-        {
-            "Industry Name": "Kuber Metal Components",
-            "Category": "Manufacturing",
-            "Address": "Talegaon MIDC, Pune, Maharashtra",
-            "City": "Pune",
-            "Contact Number": "+91 90000 11223",
-            "Website": "https://example.com/kuber-metals",
-        },
-        {
-            "Industry Name": "Nova Packaging Solutions",
-            "Category": "Manufacturing",
-            "Address": "Pimpri-Chinchwad, Pune, Maharashtra",
-            "City": "Pune",
-            "Contact Number": "+91 95555 44332",
-            "Website": "https://example.com/nova-packaging",
-        },
-    ]
-    return pd.DataFrame(data)
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
-
-def create_demo_excel(df: pd.DataFrame) -> bytes:
-    """Generate a dummy Excel file and return bytes."""
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Demo_Results")
-    return output.getvalue()
+from backend.agent_logic_case1 import run_case1_pipeline
 
 
 # -----------------------------
-# UI styling (Blue SaaS Theme)
+# Premium UI CSS
 # -----------------------------
 def _inject_css() -> None:
     st.markdown(
         """
         <style>
-        /* Global layout */
-        .block-container {
-            max-width: 1180px;
-            padding-top: 2.4rem;
-            padding-bottom: 2.4rem;
+        /* =========================================
+           RESPONSIVE TOKENS (auto font + spacing)
+        ========================================== */
+        :root{
+          --fs-base: clamp(15px, 1.05vw, 17px);
+          --fs-small: clamp(13px, 0.90vw, 14.5px);
+          --fs-medium: clamp(16px, 1.20vw, 19px);
+          --fs-title: clamp(28px, 3.2vw, 46px);
+
+          --pad-card: clamp(1rem, 2.2vw, 1.55rem);
+          --radius: 22px;
         }
 
-        /* Pastel light-blue SaaS background (NO purple) */
-        [data-testid="stAppViewContainer"] {
-            background:
-              radial-gradient(900px 450px at 20% 10%, rgba(14, 165, 233, 0.14), transparent 60%),
-              radial-gradient(800px 420px at 85% 15%, rgba(56, 189, 248, 0.12), transparent 55%),
-              linear-gradient(180deg, #f4f9ff 0%, #eef6ff 40%, #f6fbff 100%);
-        }
-
-        /* Force readable text colors everywhere */
         html, body, [class*="css"], p, span, div, label, small, a, li {
-            color: #111 !important;
-            font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont;
+          font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: var(--fs-base);
+          color: #eaf0ff !important;
         }
 
-        /* Remove default Streamlit faded label styling */
-        [data-testid="stCaptionContainer"] { color: #111 !important; opacity: 1 !important; }
-        .stCaption, .stMarkdown, .stText, .stAlert, .stToast { color: #111 !important; }
+        /* Hide Streamlit chrome */
+        #MainMenu, footer, header { visibility: hidden; }
 
-        /* Card (glass, readable) */
-        .card {
-            background: rgba(255, 255, 255, 0.84);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border-radius: 22px;
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            padding: 1.25rem 1.3rem;
-            box-shadow:
-              0 16px 34px rgba(0, 0, 0, 0.08),
-              inset 0 1px 0 rgba(255, 255, 255, 0.65);
+        /* =========================================
+           FLUID WIDTH (NO FIXED LOOK)
+        ========================================== */
+        .block-container{
+          max-width: min(96vw, 1500px);
+          padding: clamp(0.9rem, 2.6vw, 2.6rem) !important;
         }
 
-        /* Pill */
-        .pill {
-            display: inline-flex;
-            align-items: center;
-            gap: .45rem;
-            padding: .35rem .8rem;
-            border-radius: 999px;
-            font-size: .85rem;
-            font-weight: 600;
-            background: rgba(14, 165, 233, 0.10);
-            color: #111;
-            border: 1px solid rgba(14, 165, 233, 0.25);
+        /* =========================================
+           DARK + ELEGANT BACKGROUND
+        ========================================== */
+        [data-testid="stAppViewContainer"]{
+          background:
+            radial-gradient(1100px 640px at 12% 12%, rgba(99,102,241,0.22), transparent 55%),
+            radial-gradient(1050px 600px at 88% 18%, rgba(14,165,233,0.18), transparent 58%),
+            radial-gradient(900px 520px at 52% 92%, rgba(34,197,94,0.12), transparent 56%),
+            linear-gradient(180deg, #070A12 0%, #0B1220 45%, #070A12 100%);
         }
 
-        /* Title & subtitle */
-        .title {
-            font-size: 2.25rem;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            margin: 0.5rem 0 0.25rem 0;
-            color: #111;
+        /* Make captions readable */
+        [data-testid="stCaptionContainer"], .stCaption, .stMarkdown, .stText, .stAlert, .stToast {
+          color: #eaf0ff !important;
         }
 
-        .subtitle {
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: #111;
-            margin: 0 0 .35rem 0;
+        /* =========================================
+           CARDS (glass + dark mode)
+        ========================================== */
+        .card{
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: var(--radius);
+          padding: var(--pad-card);
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
+          box-shadow: 0 22px 60px rgba(0,0,0,0.35);
         }
 
-        .muted {
-            color: #111;
-            font-size: .95rem;
-            font-weight: 500;
+        /* =========================================
+           TITLES
+        ========================================== */
+        .pill{
+          display:inline-flex;
+          align-items:center;
+          gap:.55rem;
+          padding:.45rem .95rem;
+          border-radius:999px;
+          font-size: var(--fs-small);
+          font-weight: 850;
+          color:#eaf0ff;
+          background: rgba(99,102,241,0.12);
+          border: 1px solid rgba(99,102,241,0.28);
         }
 
-        /* Section headings inside cards */
-        h1, h2, h3, h4, h5, h6 { color: #111 !important; }
-        .stMarkdown h3 { margin-bottom: 0.4rem; }
-
-        /* Inputs: white bg, black text, soft gray border, blue focus */
-        .stTextInput input {
-            border-radius: 16px !important;
-            padding: 0.72rem 0.9rem !important;
-            background: #fff !important;
-            color: #111 !important;
-            border: 1px solid #ccc !important;
-            box-shadow: none !important;
-        }
-        .stTextInput input:focus {
-            border: 1px solid rgba(14,165,233,0.85) !important;
-            box-shadow: 0 0 0 4px rgba(14,165,233,0.18) !important;
+        .title{
+          font-size: var(--fs-title);
+          font-weight: 950;
+          letter-spacing: -0.04em;
+          line-height: 1.06;
+          color:#f3f6ff !important;
+          margin: .55rem 0 .15rem 0;
         }
 
-        /* Buttons: modern blue */
-        div[data-testid="stButton"] > button {
-            border-radius: 16px;
-            padding: 0.78rem 1.05rem;
-            font-weight: 750;
-            border: 1px solid rgba(14,165,233,0.35);
-            background: #0ea5e9;
-            color: #fff !important;
-            box-shadow: 0 14px 26px rgba(14, 165, 233, 0.22);
-            transition: all 0.22s ease;
-        }
-        div[data-testid="stButton"] > button:hover {
-            background: #0284c7; /* darker on hover */
-            border-color: rgba(2,132,199,0.6);
-            transform: translateY(-1px);
-            box-shadow: 0 18px 34px rgba(14, 165, 233, 0.28);
+        .subtitle{
+          font-size: var(--fs-medium);
+          font-weight: 720;
+          color:#eaf0ff !important;
+          opacity:.92;
+          margin: 0;
         }
 
-        /* Download button styling */
-        div[data-testid="stDownloadButton"] > button {
-            border-radius: 16px;
-            padding: 0.78rem 1.05rem;
-            font-weight: 750;
-            border: 1px solid rgba(14,165,233,0.35);
-            background: #0ea5e9;
-            color: #fff !important;
-            box-shadow: 0 14px 26px rgba(14, 165, 233, 0.22);
-            transition: all 0.22s ease;
-        }
-        div[data-testid="stDownloadButton"] > button:hover {
-            background: #0284c7;
-            border-color: rgba(2,132,199,0.6);
-            transform: translateY(-1px);
-            box-shadow: 0 18px 34px rgba(14, 165, 233, 0.28);
+        .muted{
+          font-size: var(--fs-small);
+          font-weight: 650;
+          color:#d7e2ff !important;
+          opacity: .85;
         }
 
-        /* Logs: high contrast */
-        .logline {
-            display: flex;
-            align-items: center;
-            gap: .65rem;
-            padding: .6rem .75rem;
-            border-radius: 14px;
-            background: rgba(255, 255, 255, 0.90);
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            margin: .4rem 0;
-        }
-        .dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #0ea5e9;
-            box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.18);
+        /* =========================================
+           INPUTS (responsive + dark)
+        ========================================== */
+        .stTextInput label{
+          font-size: var(--fs-medium) !important;
+          font-weight: 850 !important;
+          color:#eaf0ff !important;
         }
 
-        /* Dataframe container */
-        [data-testid="stDataFrame"] {
-            border-radius: 16px;
-            overflow: hidden;
-            border: 1px solid rgba(0,0,0,0.08);
-            background: rgba(255,255,255,0.95);
+        .stTextInput input{
+          border-radius: 16px !important;
+          padding: clamp(0.78rem, 1.4vw, 1.02rem) !important;
+          font-size: var(--fs-medium) !important;
+          background: rgba(255,255,255,0.08) !important;
+          color: #f3f6ff !important;
+          border: 1px solid rgba(255,255,255,0.16) !important;
+          box-shadow: 0 12px 26px rgba(0,0,0,0.25) !important;
         }
 
-        /* Captions: keep readable (not faded) */
-        .stCaption, [data-testid="stCaptionContainer"] {
-            opacity: 1 !important;
-            color: #111 !important;
-            font-weight: 600 !important;
+        .stTextInput input::placeholder{
+          color: rgba(234,240,255,0.55) !important;
         }
 
-        /* Subtle fade-in */
-        .fade-in { animation: fadeIn 260ms ease-out; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(6px); }
-            to { opacity: 1; transform: translateY(0); }
+        .stTextInput input:focus{
+          border: 1px solid rgba(99,102,241,0.85) !important;
+          box-shadow: 0 0 0 4px rgba(99,102,241,0.22) !important;
+        }
+
+        /* =========================================
+           BUTTONS (premium gradient)
+        ========================================== */
+        div[data-testid="stButton"] > button,
+        div[data-testid="stDownloadButton"] > button{
+          border-radius: 18px;
+          padding: clamp(0.85rem, 1.5vw, 1.05rem) clamp(1.05rem, 1.8vw, 1.2rem);
+          font-size: var(--fs-medium);
+          font-weight: 950;
+          border: 1px solid rgba(255,255,255,0.14);
+          background: linear-gradient(135deg, #4f46e5 0%, #0ea5e9 55%, #22c55e 140%);
+          color:#fff !important;
+          box-shadow: 0 20px 52px rgba(79,70,229,0.35);
+          transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+        }
+
+        div[data-testid="stButton"] > button:hover,
+        div[data-testid="stDownloadButton"] > button:hover{
+          transform: translateY(-2px);
+          filter: brightness(1.05);
+          box-shadow: 0 28px 70px rgba(79,70,229,0.45);
+        }
+
+        /* =========================================
+           LOGS
+        ========================================== */
+        .logline{
+          display:flex;
+          align-items:center;
+          gap:.8rem;
+          padding:.78rem .95rem;
+          border-radius: 16px;
+          background: rgba(255,255,255,0.06);
+          border: 1px solid rgba(255,255,255,0.12);
+          margin: .5rem 0;
+          box-shadow: 0 16px 36px rgba(0,0,0,0.28);
+        }
+
+        .dot{
+          width: 11px;
+          height: 11px;
+          border-radius: 50%;
+          background: #4f46e5;
+          box-shadow: 0 0 0 5px rgba(79,70,229,0.22);
+        }
+
+        /* =========================================
+           TABLE (dark container)
+        ========================================== */
+        [data-testid="stDataFrame"]{
+          border-radius: 18px;
+          overflow: hidden;
+          border: 1px solid rgba(255,255,255,0.14);
+          background: rgba(255,255,255,0.05);
+          box-shadow: 0 18px 44px rgba(0,0,0,0.32);
+        }
+
+        /* =========================================
+           MOBILE OPTIMIZATION (no layout change, just spacing)
+        ========================================== */
+        @media (max-width: 900px){
+          .block-container{ max-width: 98vw; padding: 1rem !important; }
+          .card{ padding: 1rem; }
         }
         </style>
         """,
@@ -244,18 +220,26 @@ def _inject_css() -> None:
     )
 
 
-# -----------------------------
-# UI sections
-# -----------------------------
+
 def _hero_section() -> None:
+    now = datetime.now().strftime("%d %b %Y, %I:%M %p")
     st.markdown(
-        """
-        <div class="card fade-in" style="text-align:center;">
-          <div class="pill">🏭 Case 1 • Data Mining Platform</div>
-          <div class="title">Manufacturing Industries</div>
-          <div class="subtitle">Case 1 – Manufacturing Industries Data Mining Platform</div>
-          <div class="muted" style="max-width: 780px; margin: 0.45rem auto 0 auto;">
-            A clean, modern SaaS-style dashboard UI to discover, preview, and export manufacturing industry data.
+        f"""
+        <div class="card fade-in">
+          <div style="display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+            <div>
+              <div class="pill">🧩 pixel11 • Real Businesses</div>
+              <div class="title">Data Mining Platform</div>
+              <div class="subtitle">Search any category: hospitals • schools • colleges • industries • services</div>
+              <div class="muted" style="margin-top:.35rem;">
+                Professional output • Clean Excel export • Live results preview
+              </div>
+            </div>
+            <div style="text-align:right; min-width: 220px;">
+              <div class="muted" style="font-weight:800;">Status</div>
+              <div style="font-weight:900; font-size:1.02rem;">Ready ✅</div>
+              <div class="muted" style="margin-top:.25rem;">{now}</div>
+            </div>
           </div>
         </div>
         """,
@@ -265,14 +249,13 @@ def _hero_section() -> None:
 
 def _log_card(messages: list[str]) -> None:
     st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
-    st.markdown("### 🧾 Status Logs")
-    st.caption("Placeholder logs (demo) — backend integration will replace these later.")
+    st.markdown("### 🧾 Status")
     for msg in messages:
         st.markdown(
             f"""
             <div class="logline">
               <span class="dot"></span>
-              <span style="font-weight:800; color:#111;">{msg}</span>
+              <span style="font-weight:900;">{msg}</span>
             </div>
             """,
             unsafe_allow_html=True,
@@ -280,35 +263,45 @@ def _log_card(messages: list[str]) -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _results_card(df: pd.DataFrame) -> None:
+def _results_card(df: pd.DataFrame, caption: str) -> None:
     st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
-    st.markdown("### 📊 Preview Table")
-    st.caption("Demo data preview (placeholder).")
-    st.dataframe(df, use_container_width=True, height=300)
+    st.markdown("### 📊 Preview")
+    st.caption(caption)
+    st.dataframe(df, use_container_width=True, height=340)
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _download_card(excel_bytes: bytes) -> None:
+def _download_card(excel_bytes: bytes, file_name: str) -> None:
     st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
     st.markdown("### ⬇️ Export")
-    st.caption("Download a demo Excel file now. Later this will export the real dataset.")
+    st.caption("Download the Excel file generated by the backend pipeline.")
     st.download_button(
         "📥 Download Excel",
         data=excel_bytes,
-        file_name="case1_demo_manufacturing_industries.xlsx",
+        file_name=file_name,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-# -----------------------------
-# Main UI
-# -----------------------------
+def _kpi_strip(raw_count: int, clean_count: int) -> None:
+    st.markdown(
+        f"""
+        <div class="kpi-wrap">
+          <div class="kpi"><small>RAW</small> {raw_count}</div>
+          <div class="kpi"><small>CLEAN</small> {clean_count}</div>
+          <div class="kpi"><small>SOURCE</small> pixel11</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def main() -> None:
     st.set_page_config(
-        page_title="Case 1 — Manufacturing Industries",
-        page_icon="🏭",
+        page_title="Data Mining Platform — pixel11",
+        page_icon="🧩",
         layout="wide",
     )
 
@@ -318,64 +311,121 @@ def main() -> None:
 
     st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
     st.markdown("### 🔎 Search")
-    st.caption("Enter a query like: Manufacturing industries near Pune")
+    st.caption("Tip: Keep query short (e.g. “hospitals”, “schools”, “colleges”, “manufacturing”, “restaurants”).")
 
-    # NEW INPUTS: vertical order (location -> place/area -> query)
-    location = st.text_input(
-        "Enter your location",
-        placeholder="Pune, Maharashtra",
-        key="location_input",
-    )
-    place = st.text_input(
-        "Enter specific place or area",
-        placeholder="Hinjewadi Phase 2",
-        key="place_input",
-    )
-    query = st.text_input(
-        "Enter your search query (e.g., Manufacturing industries near Pune)",
-        placeholder="Manufacturing industries near Pune",
-        key="query_input",
-    )
+    c1, c2, c3 = st.columns([1.15, 1.15, 1.4], gap="large")
+    with c1:
+        st.text_input("Enter your location", placeholder="Pune, Maharashtra", key="location_input")
+    with c2:
+        st.text_input("Enter specific place or area", placeholder="Hinjewadi Phase 2", key="place_input")
+    with c3:
+        st.text_input("Enter what you want to find", placeholder="hospitals", key="query_input")
 
-    col_btn_left, col_btn_right = st.columns([5, 2])
+    col_btn_left, col_btn_right = st.columns([6, 2])
     with col_btn_left:
-        st.markdown("<div style='height: 0.15rem;'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='muted'>Example: <b>hospitals</b> in <b>Hinjewadi</b>, <b>Pune</b></div>", unsafe_allow_html=True)
     with col_btn_right:
-        st.markdown("<div style='height: 0.15rem;'></div>", unsafe_allow_html=True)
         generate_clicked = st.button("✨ Generate Data", use_container_width=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    if "demo_df" not in st.session_state:
-        st.session_state.demo_df = load_demo_data()
-    if "excel_bytes" not in st.session_state:
-        st.session_state.excel_bytes = create_demo_excel(st.session_state.demo_df)
+    if "result_df" not in st.session_state:
+        st.session_state.result_df = pd.DataFrame()
+        st.session_state.caption = "Run a search to preview real results."
+        st.session_state.excel_bytes = None
+        st.session_state.excel_name = None
+        st.session_state.stats = {"raw_count": 0, "clean_count": 0}
 
     if generate_clicked:
-        # Read inputs from session_state (for future backend integration)
-        location = st.session_state.get("location_input")
-        place = st.session_state.get("place_input")
-        query = st.session_state.get("query_input")
+        location = (st.session_state.get("location_input") or "").strip()
+        place = (st.session_state.get("place_input") or "").strip()
+        query = (st.session_state.get("query_input") or "").strip()
 
-        # TODO: use location, place, query for backend scraping
+        if not location:
+            st.error("Please enter your location.")
+            st.stop()
+        if not query:
+            st.error("Please enter what you want to find.")
+            st.stop()
 
-        logs = ["Scraping started…", "Mining data…", "Excel generated…"]
-        st.session_state.demo_df = load_demo_data()
-        st.session_state.excel_bytes = create_demo_excel(st.session_state.demo_df)
+        logs = ["pixel11 query started…", "Cleaning & de-duplication…", "Excel generated…"]
         st.write("")
         _log_card(logs)
 
+        with st.spinner("Fetching real results from pixel11…"):
+            result = run_case1_pipeline(
+                query=query,
+                location=location,
+                place=place,
+                use_gpt=False,
+            )
+
+        excel_path = result.get("excel_path")
+        stats = result.get("stats", {}) or {}
+        st.session_state.stats = stats
+
+        if excel_path and os.path.exists(excel_path):
+            df = pd.read_excel(excel_path)
+            st.session_state.result_df = df
+            st.session_state.caption = (
+                f"Real backend output • Raw: {stats.get('raw_count', 0)} | Clean: {stats.get('clean_count', 0)}"
+            )
+
+            with open(excel_path, "rb") as f:
+                st.session_state.excel_bytes = f.read()
+            st.session_state.excel_name = os.path.basename(excel_path)
+
+            st.success("Done ✅ Data generated successfully.")
+        else:
+            st.error("Excel file not found. Please try again.")
+
     st.write("")
-    left, right = st.columns([3, 2], gap="large")
+    left, right = st.columns([3.2, 2], gap="large")
+
     with left:
-        _results_card(st.session_state.demo_df)
+        st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
+        st.markdown("### 📈 Overview")
+        _kpi_strip(
+            int(st.session_state.stats.get("raw_count", 0)),
+            int(st.session_state.stats.get("clean_count", 0)),
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        if st.session_state.result_df is not None and not st.session_state.result_df.empty:
+            _results_card(st.session_state.result_df, st.session_state.caption)
+        else:
+            st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
+            st.markdown("### 📊 Preview")
+            st.caption(st.session_state.caption)
+            st.info("No data yet. Click **Generate Data** to fetch real results.")
+            st.markdown("</div>", unsafe_allow_html=True)
+
     with right:
-        _download_card(st.session_state.excel_bytes)
+        if st.session_state.excel_bytes and st.session_state.excel_name:
+            _download_card(st.session_state.excel_bytes, st.session_state.excel_name)
+        else:
+            st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
+            st.markdown("### ⬇️ Export")
+            st.caption("Run the pipeline to enable Excel download.")
+            st.info("Excel download will appear here after data is generated.")
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown(
+            """
+            <div class="card fade-in" style="margin-top:1rem;">
+              <div style="font-weight:900; font-size:1.05rem; margin-bottom:.25rem;">✅ Notes</div>
+              <div class="muted">• Data source: pixel11</div>
+              <div class="muted">• Better queries: “hospitals”, “schools”, “colleges”, “manufacturing”</div>
+              <div class="muted">• Use Place to narrow: “Hinjewadi”, “Bhosari”, “Chakan”</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown(
         """
-        <div style="text-align:center; margin-top: 1rem; color: #111; font-size: 0.92rem; font-weight: 650;">
-          ✅ Clean SaaS Blue Theme • Case 1 only • Backend integration next
+        <div style="text-align:center; margin-top: 1.1rem; opacity:.8; font-size: 0.92rem; font-weight: 700;">
+          Built for real-time business discovery • pixel11 only • Excel-ready output
         </div>
         """,
         unsafe_allow_html=True,
