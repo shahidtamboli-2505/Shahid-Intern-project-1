@@ -17,15 +17,12 @@ from backend.agent_logic_case1 import run_case1_pipeline
 
 
 # -----------------------------
-# Premium UI CSS
+# Premium UI CSS (Responsive + Dark Elegant)
 # -----------------------------
 def _inject_css() -> None:
     st.markdown(
         """
         <style>
-        /* =========================================
-           RESPONSIVE TOKENS (auto font + spacing)
-        ========================================== */
         :root{
           --fs-base: clamp(15px, 1.05vw, 17px);
           --fs-small: clamp(13px, 0.90vw, 14.5px);
@@ -42,20 +39,13 @@ def _inject_css() -> None:
           color: #eaf0ff !important;
         }
 
-        /* Hide Streamlit chrome */
         #MainMenu, footer, header { visibility: hidden; }
 
-        /* =========================================
-           FLUID WIDTH (NO FIXED LOOK)
-        ========================================== */
         .block-container{
           max-width: min(96vw, 1500px);
           padding: clamp(0.9rem, 2.6vw, 2.6rem) !important;
         }
 
-        /* =========================================
-           DARK + ELEGANT BACKGROUND
-        ========================================== */
         [data-testid="stAppViewContainer"]{
           background:
             radial-gradient(1100px 640px at 12% 12%, rgba(99,102,241,0.22), transparent 55%),
@@ -64,14 +54,10 @@ def _inject_css() -> None:
             linear-gradient(180deg, #070A12 0%, #0B1220 45%, #070A12 100%);
         }
 
-        /* Make captions readable */
         [data-testid="stCaptionContainer"], .stCaption, .stMarkdown, .stText, .stAlert, .stToast {
           color: #eaf0ff !important;
         }
 
-        /* =========================================
-           CARDS (glass + dark mode)
-        ========================================== */
         .card{
           background: rgba(255,255,255,0.06);
           border: 1px solid rgba(255,255,255,0.12);
@@ -82,9 +68,6 @@ def _inject_css() -> None:
           box-shadow: 0 22px 60px rgba(0,0,0,0.35);
         }
 
-        /* =========================================
-           TITLES
-        ========================================== */
         .pill{
           display:inline-flex;
           align-items:center;
@@ -122,9 +105,6 @@ def _inject_css() -> None:
           opacity: .85;
         }
 
-        /* =========================================
-           INPUTS (responsive + dark)
-        ========================================== */
         .stTextInput label{
           font-size: var(--fs-medium) !important;
           font-weight: 850 !important;
@@ -150,9 +130,6 @@ def _inject_css() -> None:
           box-shadow: 0 0 0 4px rgba(99,102,241,0.22) !important;
         }
 
-        /* =========================================
-           BUTTONS (premium gradient)
-        ========================================== */
         div[data-testid="stButton"] > button,
         div[data-testid="stDownloadButton"] > button{
           border-radius: 18px;
@@ -173,9 +150,6 @@ def _inject_css() -> None:
           box-shadow: 0 28px 70px rgba(79,70,229,0.45);
         }
 
-        /* =========================================
-           LOGS
-        ========================================== */
         .logline{
           display:flex;
           align-items:center;
@@ -196,9 +170,6 @@ def _inject_css() -> None:
           box-shadow: 0 0 0 5px rgba(79,70,229,0.22);
         }
 
-        /* =========================================
-           TABLE (dark container)
-        ========================================== */
         [data-testid="stDataFrame"]{
           border-radius: 18px;
           overflow: hidden;
@@ -207,9 +178,12 @@ def _inject_css() -> None:
           box-shadow: 0 18px 44px rgba(0,0,0,0.32);
         }
 
-        /* =========================================
-           MOBILE OPTIMIZATION (no layout change, just spacing)
-        ========================================== */
+        .fade-in { animation: fadeIn 260ms ease-out; }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
         @media (max-width: 900px){
           .block-container{ max-width: 98vw; padding: 1rem !important; }
           .card{ padding: 1rem; }
@@ -218,7 +192,6 @@ def _inject_css() -> None:
         """,
         unsafe_allow_html=True,
     )
-
 
 
 def _hero_section() -> None:
@@ -285,19 +258,6 @@ def _download_card(excel_bytes: bytes, file_name: str) -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _kpi_strip(raw_count: int, clean_count: int) -> None:
-    st.markdown(
-        f"""
-        <div class="kpi-wrap">
-          <div class="kpi"><small>RAW</small> {raw_count}</div>
-          <div class="kpi"><small>CLEAN</small> {clean_count}</div>
-          <div class="kpi"><small>SOURCE</small> pixel11</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 def main() -> None:
     st.set_page_config(
         page_title="Data Mining Platform — pixel11",
@@ -334,7 +294,6 @@ def main() -> None:
         st.session_state.caption = "Run a search to preview real results."
         st.session_state.excel_bytes = None
         st.session_state.excel_name = None
-        st.session_state.stats = {"raw_count": 0, "clean_count": 0}
 
     if generate_clicked:
         location = (st.session_state.get("location_input") or "").strip()
@@ -362,7 +321,6 @@ def main() -> None:
 
         excel_path = result.get("excel_path")
         stats = result.get("stats", {}) or {}
-        st.session_state.stats = stats
 
         if excel_path and os.path.exists(excel_path):
             df = pd.read_excel(excel_path)
@@ -383,14 +341,6 @@ def main() -> None:
     left, right = st.columns([3.2, 2], gap="large")
 
     with left:
-        st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
-        st.markdown("### 📈 Overview")
-        _kpi_strip(
-            int(st.session_state.stats.get("raw_count", 0)),
-            int(st.session_state.stats.get("clean_count", 0)),
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-
         if st.session_state.result_df is not None and not st.session_state.result_df.empty:
             _results_card(st.session_state.result_df, st.session_state.caption)
         else:
