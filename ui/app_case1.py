@@ -20,6 +20,7 @@ from backend.agent_logic_case1 import run_case1_pipeline
 
 
 # -----------------------------
+<<<<<<< HEAD
 # Helpers
 # -----------------------------
 def _b64_image(path: str) -> str:
@@ -57,6 +58,9 @@ def _safe_int(x: Any, default: int = 0) -> int:
 
 # -----------------------------
 # Pixel11-style UI CSS
+=======
+# Premium UI CSS (Responsive + Dark Elegant)
+>>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
 # -----------------------------
 def _inject_css() -> None:
     st.markdown(
@@ -106,6 +110,7 @@ def _inject_css() -> None:
             linear-gradient(180deg, #050507 0%, #050507 100%);
         }
 
+<<<<<<< HEAD
         [data-testid="stAppViewContainer"]::before{
           content:"";
           position: fixed;
@@ -199,6 +204,12 @@ def _inject_css() -> None:
         .bb7{ top: 90%; left: 52%; animation-delay: 2.9s; }
         .bb8{ top: 28%; left: 72%; animation-delay: 3.2s; }
 
+=======
+        [data-testid="stCaptionContainer"], .stCaption, .stMarkdown, .stText, .stAlert, .stToast {
+          color: #eaf0ff !important;
+        }
+
+>>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
         .card{
           background: var(--panel);
           border: 1px solid var(--stroke);
@@ -211,6 +222,7 @@ def _inject_css() -> None:
           z-index: 3;
         }
 
+<<<<<<< HEAD
         .px-hero{
           position: relative;
           overflow: hidden;
@@ -220,6 +232,19 @@ def _inject_css() -> None:
           border: 1px solid rgba(255,255,255,0.06);
           border-radius: var(--radius);
           z-index: 3;
+=======
+        .pill{
+          display:inline-flex;
+          align-items:center;
+          gap:.55rem;
+          padding:.45rem .95rem;
+          border-radius:999px;
+          font-size: var(--fs-small);
+          font-weight: 850;
+          color:#eaf0ff;
+          background: rgba(99,102,241,0.12);
+          border: 1px solid rgba(99,102,241,0.28);
+>>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
         }
         .px-hero::before{
           content:"";
@@ -255,6 +280,7 @@ def _inject_css() -> None:
           z-index: 2;
         }
 
+<<<<<<< HEAD
         .wave-wrap{
           margin-top: 14px;
           border-radius: 18px;
@@ -264,6 +290,9 @@ def _inject_css() -> None:
         }
 
         .stTextInput label, .stNumberInput label{
+=======
+        .stTextInput label{
+>>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
           font-size: var(--fs-medium) !important;
           font-weight: 850 !important;
           color: rgba(244,244,247,0.92) !important;
@@ -278,6 +307,18 @@ def _inject_css() -> None:
           box-shadow: 0 16px 45px rgba(0,0,0,0.45) !important;
         }
 
+<<<<<<< HEAD
+=======
+        .stTextInput input::placeholder{
+          color: rgba(234,240,255,0.55) !important;
+        }
+
+        .stTextInput input:focus{
+          border: 1px solid rgba(99,102,241,0.85) !important;
+          box-shadow: 0 0 0 4px rgba(99,102,241,0.22) !important;
+        }
+
+>>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
         div[data-testid="stButton"] > button,
         div[data-testid="stDownloadButton"] > button{
           border-radius: 999px;
@@ -331,6 +372,15 @@ def _inject_css() -> None:
           to   { opacity: 1; transform: translateY(0); }
         }
 
+<<<<<<< HEAD
+=======
+        .fade-in { animation: fadeIn 260ms ease-out; }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+
+>>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
         @media (max-width: 900px){
           .block-container{ max-width: 98vw; padding: 1rem !important; padding-top: 6.8rem !important; }
           .px-brand img{ height: 56px; }
@@ -343,6 +393,7 @@ def _inject_css() -> None:
     )
 
 
+<<<<<<< HEAD
 def _navbar() -> None:
     base_dir = os.path.abspath(os.path.dirname(__file__))
     logo_path = os.path.join(base_dir, "assets", "pixel11_logo.jpeg")
@@ -357,6 +408,10 @@ def _navbar() -> None:
             'display:flex;align-items:center;justify-content:center;font-weight:950;">P</div>'
         )
 
+=======
+def _hero_section() -> None:
+    now = datetime.now().strftime("%d %b %Y, %I:%M %p")
+>>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
     st.markdown(
         f"""
         <div class="px-nav">
@@ -457,6 +512,7 @@ def _download_card(excel_bytes: bytes, file_name: str) -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+<<<<<<< HEAD
 def _stats_card(stats: Dict[str, Any]) -> None:
     st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
     st.markdown("### 📌 Summary")
@@ -493,6 +549,8 @@ def _stats_card(stats: Dict[str, Any]) -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
+=======
+>>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
 def main() -> None:
     st.set_page_config(
         page_title="Data Mining Platform — Pixel11 Theme",
@@ -516,6 +574,7 @@ def main() -> None:
         st.session_state.caption = "Run a search to preview real results."
         st.session_state.excel_bytes = None
         st.session_state.excel_name = None
+<<<<<<< HEAD
         st.session_state.stats = {}
 
     # HERO
@@ -608,6 +667,8 @@ def main() -> None:
         unsafe_allow_html=True,
     )
     st.markdown("</div>", unsafe_allow_html=True)
+=======
+>>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
 
     if generate_clicked:
         location = (st.session_state.get("location_input") or "").strip()
@@ -661,9 +722,12 @@ def main() -> None:
             st.stop()
 
         stats = result.get("stats", {}) or {}
+<<<<<<< HEAD
         cleaned_rows = result.get("cleaned_rows") or []
         excel_bytes = result.get("excel_bytes")
         excel_path = result.get("excel_path")
+=======
+>>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
 
         df = pd.DataFrame(cleaned_rows) if cleaned_rows else pd.DataFrame()
         if (not excel_bytes) and excel_path:
