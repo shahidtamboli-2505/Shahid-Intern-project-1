@@ -1,5 +1,8 @@
 # backend/miner.py
-# GOOGLE PLACES ONLY miner (simple clean + dedupe)
+# GOOGLE PLACES ONLY miner (clean + dedupe)
+# ✅ Case-2 ready: Top Level Management placeholders + case2 payload slot
+
+from __future__ import annotations
 
 from typing import List, Dict, Any, Tuple
 import re
@@ -30,9 +33,29 @@ def _norm_url(u: str) -> str:
     return u
 
 
-def _has_website(w: str) -> bool:
+def _has_website_fallback(w: str) -> bool:
     w = (w or "").strip()
-    return bool(w) and (w.startswith("http://") or w.startswith("https://") or "." in w)
+    return bool(w) and ("." in w)
+
+
+def _to_float(x):
+    try:
+        if x is None:
+            return None
+        s = str(x).strip()
+        return float(s) if s else None
+    except Exception:
+        return None
+
+
+def _to_int(x):
+    try:
+        if x is None:
+            return None
+        s = str(x).strip()
+        return int(float(s)) if s else None
+    except Exception:
+        return None
 
 
 def _infer_city_state_from_address(addr: str) -> Tuple[str, str]:
@@ -41,10 +64,8 @@ def _infer_city_state_from_address(addr: str) -> Tuple[str, str]:
         return "", ""
     parts = [p.strip() for p in a.split(",") if p.strip()]
     if len(parts) >= 2:
-        state = parts[-1]
-        city = parts[-2]
-        city = re.sub(r"\b\d{6}\b", "", city).strip()
-        state = re.sub(r"\b\d{6}\b", "", state).strip()
+        state = re.sub(r"\b\d{6}\b", "", parts[-1]).strip()
+        city = re.sub(r"\b\d{6}\b", "", parts[-2]).strip()
         return city, state
     return "", ""
 
@@ -54,10 +75,13 @@ def mine_case1_records(
     gpt_client=None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
-    GOOGLE ONLY:
-    raw_records expected keys (from scraper.py):
-      name, raw_category, address, phone, email, website, source_name, source_url
+    Case-1 Miner (Google Places only)
+
+    Case-2 READY:
+    - Adds Top-Level Management columns (empty placeholders)
+    - Adds `case2_management` + `case2_meta` slots (for backend fill)
     """
+
     cleaned: List[Dict[str, Any]] = []
     seen = set()
 
@@ -69,21 +93,30 @@ def mine_case1_records(
         website = _norm_url(r.get("website", ""))
 
         raw_cat = _norm_text(r.get("raw_category", "")) or "Business / Services"
-        source_name = _norm_text(r.get("source_name", "google_places")) or "google_places"
+        source_name = _norm_text(r.get("source_name", "google_places"))
         source_url = _norm_url(r.get("source_url", ""))
+
+        rating = _to_float(r.get("google_rating"))
+        rating_count = _to_int(r.get("google_rating_count"))
+
+        has_web_flag = r.get("has_website")
+        has_website_bool = has_web_flag if isinstance(has_web_flag, bool) else _has_website_fallback(website)
+        has_website_str = "Yes" if has_website_bool else "No"
 
         if not name and not source_url:
             continue
 
-        # ✅ Simple dedupe: name + address + phone
-        key = (name.lower(), addr.lower(), phone)
-        if key in seen:
+        dedupe_key = (name.lower(), addr.lower(), phone, website.lower())
+        if dedupe_key in seen:
             continue
-        seen.add(key)
+        seen.add(dedupe_key)
 
         city, state = _infer_city_state_from_address(addr)
 
         cleaned.append({
+            # -----------------------------
+            # Case-1 Core Fields
+            # -----------------------------
             "Name": name or "Unknown",
             "Primary Category": raw_cat,
             "Address": addr,
@@ -92,16 +125,63 @@ def mine_case1_records(
             "Phone": phone,
             "Email": email,
             "Website": website,
-            "Has Website": "Yes" if _has_website(website) else "No",
+
+            # Case-2 base fields (already decided)
+            "Has Website": has_website_str,
+            "Has Website (Bool)": has_website_bool,  # internal use (optional)
+            "Google Rating": rating if rating is not None else "",
+            "Google Rating Count": rating_count if rating_count is not None else "",
+
             "Source Name": source_name,
             "Source URL": source_url,
+
+            # -----------------------------
+            # Case-2 payload slots (NOT exported directly)
+            # Excel utils will read `case2_management` and fill columns
+            # -----------------------------
+            "case2_management": {},   # {bucket: {name, designation, email, phone, linkedin}}
+            "case2_meta": {},         # debug/meta like counts, pages visited etc.
+
+            # -----------------------------
+            # Case-2: Top Level Management (PLACEHOLDERS)
+            # (kept for exam-safe / visible schema)
+            # -----------------------------
+            "Executive Name": "",
+            "Executive Designation": "",
+            "Executive Email": "",
+            "Executive Phone": "",
+            "Executive LinkedIn": "",
+
+            "Tech/Ops Name": "",
+            "Tech/Ops Designation": "",
+            "Tech/Ops Email": "",
+            "Tech/Ops Phone": "",
+            "Tech/Ops LinkedIn": "",
+
+            "Finance/Admin Name": "",
+            "Finance/Admin Designation": "",
+            "Finance/Admin Email": "",
+            "Finance/Admin Phone": "",
+            "Finance/Admin LinkedIn": "",
+
+            "Business/Growth Name": "",
+            "Business/Growth Designation": "",
+            "Business/Growth Email": "",
+            "Business/Growth Phone": "",
+            "Business/Growth LinkedIn": "",
+
+            "Marketing/Brand Name": "",
+            "Marketing/Brand Designation": "",
+            "Marketing/Brand Email": "",
+            "Marketing/Brand Phone": "",
+            "Marketing/Brand LinkedIn": "",
         })
 
     stats = {
         "raw_count": len(raw_records),
         "clean_count": len(cleaned),
-        "with_website": sum(1 for x in cleaned if x["Has Website"] == "Yes"),
-        "no_website": sum(1 for x in cleaned if x["Has Website"] == "No"),
+        "with_website": sum(1 for x in cleaned if x.get("Has Website") == "Yes"),
+        "with_rating": sum(1 for x in cleaned if str(x.get("Google Rating", "")).strip()),
     }
 
     return cleaned, stats
