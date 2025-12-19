@@ -1,78 +1,76 @@
 # backend/config.py
 # Case 1 + Case 2 — GOOGLE PLACES ONLY configuration
-# 🔒 Exam-safe | Future-ready | No hardcoded secrets
+# 🔒 Exam-safe | Startup-ready | No hardcoded secrets
 
 import os
+
+
+def _env_int(key: str, default: int) -> int:
+    try:
+        return int(str(os.getenv(key, str(default))).strip())
+    except Exception:
+        return default
+
+
+def _env_bool(key: str, default: str = "false") -> bool:
+    return str(os.getenv(key, default)).strip().lower() == "true"
 
 
 # =========================================================
 # Case 1 — Primary Search (Google Places)
 # =========================================================
 
-# Default location if user does not provide one in UI
 DEFAULT_LOCATION = os.getenv("CASE1_DEFAULT_LOCATION", "India").strip()
+DEFAULT_TOP_N = _env_int("CASE1_DEFAULT_TOP_N", 20)
 
-# Default number of results (Top-N) shown/exported
-DEFAULT_TOP_N = int(os.getenv("CASE1_DEFAULT_TOP_N", "20"))
-
-# Absolute safety cap (UI + backend should respect this)
-# NOTE: Even if user enters more, backend must clamp
-TOP_N_CAP = int(os.getenv("CASE1_TOP_N_CAP", "200"))
+# ✅ LOCKED: 100 max
+TOP_N_CAP = _env_int("CASE1_TOP_N_CAP", 100)
+TOP_N_CAP = max(1, min(TOP_N_CAP, 100))
 
 
 # =========================================================
-# Case 2 — Intelligence Layer (BASE CONFIG)
+# Case 2 — Intelligence Layer (Website Leadership Extraction)
 # =========================================================
 
-# Master switch for Case-2 logic (env controlled)
-# Example:
-#   set CASE2_ENABLED=true
-CASE2_ENABLED = os.getenv("CASE2_ENABLED", "false").lower() == "true"
+# Master switch for Case-2 logic
+CASE2_ENABLED = _env_bool("CASE2_ENABLED", "false")
 
-# Enable deeper secondary search (website / team pages)
-# ❌ Disabled by default for safety
-CASE2_ENABLE_SECONDARY_SEARCH = (
-    os.getenv("CASE2_ENABLE_SECONDARY_SEARCH", "false").lower() == "true"
-)
+# Names-only mode (no emails/phones/linkedin)
+CASE2_NAMES_ONLY = _env_bool("CASE2_NAMES_ONLY", "true")
 
-# Time window (hours) to limit deep scraping per organization
-CASE2_TIME_WINDOW_HOURS = int(os.getenv("CASE2_TIME_WINDOW_HOURS", "72"))
+# ✅ Maximum leaders to output per org (1..5)
+CASE2_MAX_LEADERS = _env_int("CASE2_MAX_LEADERS", 5)
+CASE2_MAX_LEADERS = max(1, min(CASE2_MAX_LEADERS, 5))
 
-# Maximum organizations allowed for secondary (deep) analysis
-# Prevents over-scraping
-CASE2_MAX_SECONDARY_ORGS = int(os.getenv("CASE2_MAX_SECONDARY_ORGS", "50"))
+# ✅ How many orgs to run Case-2 on (avoid long runs)
+# Example: set CASE2_MAX_SECONDARY_ORGS=20
+CASE2_MAX_SECONDARY_ORGS = _env_int("CASE2_MAX_SECONDARY_ORGS", 20)
+CASE2_MAX_SECONDARY_ORGS = max(1, min(CASE2_MAX_SECONDARY_ORGS, 100))
 
-
-# ---------------------------------------------------------
-# Top-Level Management (Normalization Rules)
-# ---------------------------------------------------------
-
-# Always extract only a fixed number of leadership roles
-CASE2_MAX_MANAGEMENT_ROLES = int(os.getenv("CASE2_MAX_MANAGEMENT_ROLES", "5"))
-
-# Fixed leadership buckets (DOCUMENT-ALIGNED)
-# ⚠️ Do not change order unless document is updated
-CASE2_MANAGEMENT_ROLES = [
-    "Executive Leadership",
-    "Technology / Operations",
-    "Finance / Administration",
-    "Business Development / Growth",
-    "Marketing / Branding",
-]
+# ✅ Overall time cap for Case-2 (prevents hanging forever)
+# Example: set CASE2_TOTAL_TIMEOUT_SECS=90
+CASE2_TOTAL_TIMEOUT_SECS = _env_int("CASE2_TOTAL_TIMEOUT_SECS", 90)
+CASE2_TOTAL_TIMEOUT_SECS = max(20, min(CASE2_TOTAL_TIMEOUT_SECS, 600))
 
 
 # =========================================================
 # Case 2 — Website Scraping (Safe Defaults)
 # =========================================================
+# IMPORTANT:
+# - Fast mode by default (startup UX)
+# - You can override via ENV any time
 
-# HTTP timeout for each request
-CASE2_TIMEOUT_SECS = int(os.getenv("CASE2_TIMEOUT_SECS", "12"))
+# HTTP timeout for each request (fast default)
+CASE2_TIMEOUT_SECS = _env_int("CASE2_TIMEOUT_SECS", 8)  # 12 -> 8
+CASE2_TIMEOUT_SECS = max(4, min(CASE2_TIMEOUT_SECS, 25))
 
-# Per website max pages to fetch (team/about/leadership)
-CASE2_MAX_PAGES = int(os.getenv("CASE2_MAX_PAGES", "6"))
+# Per website max pages to fetch
+CASE2_MAX_PAGES = _env_int("CASE2_MAX_PAGES", 3)  # 6 -> 3
+CASE2_MAX_PAGES = max(1, min(CASE2_MAX_PAGES, 10))
 
 # Safety cap to avoid downloading huge pages
-CASE2_MAX_BYTES = int(os.getenv("CASE2_MAX_BYTES", "1500000"))
+CASE2_MAX_BYTES = _env_int("CASE2_MAX_BYTES", 900000)  # 1500000 -> 900000
+CASE2_MAX_BYTES = max(200000, min(CASE2_MAX_BYTES, 4000000))
 
 # User-Agent (avoid getting blocked)
 CASE2_USER_AGENT = os.getenv(
@@ -88,24 +86,15 @@ CASE2_USER_AGENT = os.getenv(
 # =========================================================
 # ❌ DO NOT hardcode API key here
 # ✔ API key is read from environment variable in scraper.py
-#
-# Required env var:
+# Required:
 #   GOOGLE_PLACES_API_KEY
-#
-# Example (PowerShell):
-#   $env:GOOGLE_PLACES_API_KEY="YOUR_API_KEY"
 
 
 # =========================================================
 # GPT (OPTIONAL – DISABLED BY DEFAULT)
 # =========================================================
 
-# GPT config kept only for architectural completeness
-# GPT calls are NOT used in current project
-
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-
-# GPT is considered enabled ONLY if key exists
 GPT_ENABLED = bool(OPENAI_API_KEY)

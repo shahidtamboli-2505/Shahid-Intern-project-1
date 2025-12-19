@@ -20,7 +20,6 @@ from backend.agent_logic_case1 import run_case1_pipeline
 
 
 # -----------------------------
-<<<<<<< HEAD
 # Helpers
 # -----------------------------
 def _b64_image(path: str) -> str:
@@ -58,9 +57,6 @@ def _safe_int(x: Any, default: int = 0) -> int:
 
 # -----------------------------
 # Pixel11-style UI CSS
-=======
-# Premium UI CSS (Responsive + Dark Elegant)
->>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
 # -----------------------------
 def _inject_css() -> None:
     st.markdown(
@@ -110,7 +106,6 @@ def _inject_css() -> None:
             linear-gradient(180deg, #050507 0%, #050507 100%);
         }
 
-<<<<<<< HEAD
         [data-testid="stAppViewContainer"]::before{
           content:"";
           position: fixed;
@@ -204,12 +199,6 @@ def _inject_css() -> None:
         .bb7{ top: 90%; left: 52%; animation-delay: 2.9s; }
         .bb8{ top: 28%; left: 72%; animation-delay: 3.2s; }
 
-=======
-        [data-testid="stCaptionContainer"], .stCaption, .stMarkdown, .stText, .stAlert, .stToast {
-          color: #eaf0ff !important;
-        }
-
->>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
         .card{
           background: var(--panel);
           border: 1px solid var(--stroke);
@@ -222,7 +211,6 @@ def _inject_css() -> None:
           z-index: 3;
         }
 
-<<<<<<< HEAD
         .px-hero{
           position: relative;
           overflow: hidden;
@@ -232,19 +220,6 @@ def _inject_css() -> None:
           border: 1px solid rgba(255,255,255,0.06);
           border-radius: var(--radius);
           z-index: 3;
-=======
-        .pill{
-          display:inline-flex;
-          align-items:center;
-          gap:.55rem;
-          padding:.45rem .95rem;
-          border-radius:999px;
-          font-size: var(--fs-small);
-          font-weight: 850;
-          color:#eaf0ff;
-          background: rgba(99,102,241,0.12);
-          border: 1px solid rgba(99,102,241,0.28);
->>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
         }
         .px-hero::before{
           content:"";
@@ -280,7 +255,6 @@ def _inject_css() -> None:
           z-index: 2;
         }
 
-<<<<<<< HEAD
         .wave-wrap{
           margin-top: 14px;
           border-radius: 18px;
@@ -290,9 +264,6 @@ def _inject_css() -> None:
         }
 
         .stTextInput label, .stNumberInput label{
-=======
-        .stTextInput label{
->>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
           font-size: var(--fs-medium) !important;
           font-weight: 850 !important;
           color: rgba(244,244,247,0.92) !important;
@@ -307,18 +278,6 @@ def _inject_css() -> None:
           box-shadow: 0 16px 45px rgba(0,0,0,0.45) !important;
         }
 
-<<<<<<< HEAD
-=======
-        .stTextInput input::placeholder{
-          color: rgba(234,240,255,0.55) !important;
-        }
-
-        .stTextInput input:focus{
-          border: 1px solid rgba(99,102,241,0.85) !important;
-          box-shadow: 0 0 0 4px rgba(99,102,241,0.22) !important;
-        }
-
->>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
         div[data-testid="stButton"] > button,
         div[data-testid="stDownloadButton"] > button{
           border-radius: 999px;
@@ -372,15 +331,6 @@ def _inject_css() -> None:
           to   { opacity: 1; transform: translateY(0); }
         }
 
-<<<<<<< HEAD
-=======
-        .fade-in { animation: fadeIn 260ms ease-out; }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(8px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-
->>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
         @media (max-width: 900px){
           .block-container{ max-width: 98vw; padding: 1rem !important; padding-top: 6.8rem !important; }
           .px-brand img{ height: 56px; }
@@ -393,7 +343,6 @@ def _inject_css() -> None:
     )
 
 
-<<<<<<< HEAD
 def _navbar() -> None:
     base_dir = os.path.abspath(os.path.dirname(__file__))
     logo_path = os.path.join(base_dir, "assets", "pixel11_logo.jpeg")
@@ -408,10 +357,6 @@ def _navbar() -> None:
             'display:flex;align-items:center;justify-content:center;font-weight:950;">P</div>'
         )
 
-=======
-def _hero_section() -> None:
-    now = datetime.now().strftime("%d %b %Y, %I:%M %p")
->>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
     st.markdown(
         f"""
         <div class="px-nav">
@@ -512,7 +457,6 @@ def _download_card(excel_bytes: bytes, file_name: str) -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-<<<<<<< HEAD
 def _stats_card(stats: Dict[str, Any]) -> None:
     st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
     st.markdown("### 📌 Summary")
@@ -523,15 +467,15 @@ def _stats_card(stats: Dict[str, Any]) -> None:
     no_web = _safe_int(stats.get("no_website", 0), 0)
     with_rating = _safe_int(stats.get("with_rating", 0), 0)
 
-    # Case-2 stats (safe)
     case2_enabled = bool(stats.get("case2_enabled", False))
-    case2_secondary = bool(stats.get("case2_secondary_search_enabled", False))
     case2_ran = _safe_int(stats.get("case2_ran", 0), 0)
     case2_err = _safe_int(stats.get("case2_errors", 0), 0)
+    case2_skip = _safe_int(stats.get("case2_skipped_no_website", 0), 0)
+    case2_max = _safe_int(stats.get("case2_max_leaders", 5), 5)
 
     case2_line = "OFF"
-    if case2_enabled and case2_secondary:
-        case2_line = f"ON • Processed: {case2_ran} • Errors: {case2_err}"
+    if case2_enabled:
+        case2_line = f"ON • Leaders/Org: {case2_max} • Processed: {case2_ran} • Skipped(no website): {case2_skip} • Errors: {case2_err}"
 
     st.markdown(
         f"""
@@ -541,7 +485,7 @@ def _stats_card(stats: Dict[str, Any]) -> None:
           <div class="logline"><span class="dot"></span><span style="font-weight:900;">Has Website: {with_web}</span></div>
           <div class="logline"><span class="dot"></span><span style="font-weight:900;">No Website: {no_web}</span></div>
           <div class="logline" style="grid-column: 1 / -1;"><span class="dot"></span><span style="font-weight:900;">With Google Rating: {with_rating}</span></div>
-          <div class="logline" style="grid-column: 1 / -1;"><span class="dot"></span><span style="font-weight:900;">Case-2 (Management): {case2_line}</span></div>
+          <div class="logline" style="grid-column: 1 / -1;"><span class="dot"></span><span style="font-weight:900;">Case-2 (Top Management): {case2_line}</span></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -549,8 +493,6 @@ def _stats_card(stats: Dict[str, Any]) -> None:
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-=======
->>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
 def main() -> None:
     st.set_page_config(
         page_title="Data Mining Platform — Pixel11 Theme",
@@ -574,7 +516,6 @@ def main() -> None:
         st.session_state.caption = "Run a search to preview real results."
         st.session_state.excel_bytes = None
         st.session_state.excel_name = None
-<<<<<<< HEAD
         st.session_state.stats = {}
 
     # HERO
@@ -623,7 +564,7 @@ def main() -> None:
     # Search card
     st.markdown('<div class="card fade-in">', unsafe_allow_html=True)
     st.markdown("### 🔎 Search")
-    st.caption("Case 1 (Google Places): results + website + rating columns. Case 2 can be enabled for management scraping.")
+    st.caption("Case 1 (Google Places): results + website + rating. Case 2 can be enabled for leadership extraction (names + designation only).")
 
     c1, c2, c3 = st.columns([1.15, 1.15, 1.4], gap="large")
     with c1:
@@ -633,7 +574,7 @@ def main() -> None:
     with c3:
         st.text_input("Enter what you want to find", placeholder="manufacturing / hospitals / colleges", key="query_input")
 
-    a1, a2, a3 = st.columns([1.15, 1.35, 1.5], gap="large")
+    a1, a2, a3, a4 = st.columns([1.0, 1.2, 1.25, 1.15], gap="large")
     with a1:
         st.number_input(
             "How many results (max 100)",
@@ -648,15 +589,24 @@ def main() -> None:
             "Verbose terminal logs",
             value=False,
             key="debug_toggle",
-            help="Turn ON only if you want to see page-by-page logs in terminal.",
+            help="Turn ON only if you want page-by-page logs in terminal.",
         )
     with a3:
-        # ✅ NOW CONNECTED TO BACKEND (env vars)
         st.toggle(
-            "Enable Case 2 (top-level management)",
+            "Enable Case 2 (Top Management)",
             value=False,
             key="case2_toggle",
-            help="If ON, backend will scrape website team/leadership pages (public info only).",
+            help="If ON, backend will scrape website pages and extract public top management (name + designation).",
+        )
+    with a4:
+        st.number_input(
+            "Case 2 leaders per org (max 5)",
+            min_value=1,
+            max_value=5,
+            value=5,
+            step=1,
+            key="case2_max_leaders_ui",
+            help="Top leaders to extract from each website.",
         )
 
     generate_clicked = st.button("✨ Generate Data", use_container_width=True)
@@ -667,8 +617,6 @@ def main() -> None:
         unsafe_allow_html=True,
     )
     st.markdown("</div>", unsafe_allow_html=True)
-=======
->>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
 
     if generate_clicked:
         location = (st.session_state.get("location_input") or "").strip()
@@ -677,12 +625,14 @@ def main() -> None:
         top_n = int(st.session_state.get("top_n_input") or 20)
         top_n = max(1, min(top_n, 100))
         debug = bool(st.session_state.get("debug_toggle", False))
+
         case2_on = bool(st.session_state.get("case2_toggle", False))
+        case2_max_leaders = int(st.session_state.get("case2_max_leaders_ui") or 5)
+        case2_max_leaders = max(1, min(case2_max_leaders, 5))
 
         # ✅ Set runtime env vars for backend config
-        # (backend reads env in config.py)
         os.environ["CASE2_ENABLED"] = "true" if case2_on else "false"
-        os.environ["CASE2_ENABLE_SECONDARY_SEARCH"] = "true" if case2_on else "false"
+        os.environ["CASE2_MAX_LEADERS"] = str(case2_max_leaders)
 
         if not location:
             st.error("Please enter your location.")
@@ -697,7 +647,7 @@ def main() -> None:
             "Cleaning & de-duplication…",
         ]
         if case2_on:
-            logs.append("Case 2 enabled: scraping management from websites…")
+            logs.append(f"Case 2 enabled: extracting top {case2_max_leaders} leaders from websites…")
         logs.append("Generating Excel…")
 
         _log_card(logs)
@@ -722,12 +672,9 @@ def main() -> None:
             st.stop()
 
         stats = result.get("stats", {}) or {}
-<<<<<<< HEAD
         cleaned_rows = result.get("cleaned_rows") or []
         excel_bytes = result.get("excel_bytes")
         excel_path = result.get("excel_path")
-=======
->>>>>>> e8cf0b1e8531f550d9e18b0c52f50c0b433d8c67
 
         df = pd.DataFrame(cleaned_rows) if cleaned_rows else pd.DataFrame()
         if (not excel_bytes) and excel_path:
@@ -790,7 +737,7 @@ def main() -> None:
             <div class="card fade-in" style="margin-top:1rem;">
               <div style="font-weight:950; font-size:1.05rem; margin-bottom:.25rem;">✅ Notes</div>
               <div style="color: rgba(244,244,247,0.70); font-weight:800;">• Case 1: nearby organizations + website + rating</div>
-              <div style="color: rgba(244,244,247,0.70); font-weight:800;">• Case 2: top-level management (public website scraping)</div>
+              <div style="color: rgba(244,244,247,0.70); font-weight:800;">• Case 2: top management (name + designation only)</div>
               <div style="color: rgba(244,244,247,0.70); font-weight:800;">• Try queries: “hospitals”, “colleges”, “manufacturing”, “schools”</div>
               <div style="color: rgba(244,244,247,0.70); font-weight:800;">• Use Place to narrow: “Hinjewadi”, “Bhosari”, “Chakan”</div>
               <div style="color: rgba(244,244,247,0.70); font-weight:800;">• Top N is capped at 100 (UI + backend)</div>

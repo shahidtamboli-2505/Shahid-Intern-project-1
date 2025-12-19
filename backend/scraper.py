@@ -11,6 +11,7 @@ import os
 import json
 import time
 from typing import Dict, List, Tuple, Any, Optional, Set
+from urllib.parse import urlparse
 
 import requests
 
@@ -115,6 +116,17 @@ def _safe_int(x: Any) -> Optional[int]:
         return None
 
 
+def _get_domain(url: str) -> str:
+    try:
+        if not url:
+            return ""
+        u = urlparse(url)
+        netloc = (u.netloc or "").strip()
+        return netloc.replace("www.", "").strip()
+    except Exception:
+        return ""
+
+
 def _post_with_retry(url: str, headers: Dict[str, str], payload: Dict[str, Any]) -> requests.Response:
     last_err: Optional[Exception] = None
     for attempt in range(1, MAX_RETRIES + 1):
@@ -122,8 +134,7 @@ def _post_with_retry(url: str, headers: Dict[str, str], payload: Dict[str, Any])
             return requests.post(url, headers=headers, json=payload, timeout=HTTP_TIMEOUT_SECS)
         except Exception as e:
             last_err = e
-            # small backoff
-            time.sleep(0.8 * attempt)
+            time.sleep(0.8 * attempt)  # small backoff
     raise RuntimeError(f"❌ Google Places request failed after {MAX_RETRIES} retries: {last_err}")
 
 
@@ -134,6 +145,15 @@ def scrape_google_places(
     max_results: int = DEFAULT_MAX_RESULTS,
     debug: bool = True,
 ) -> List[Dict[str, Any]]:
+    """
+    Returns records in an Excel-friendly schema:
+      - company_name, industry
+      - google_rating, google_rating_count
+      - has_website, website_url, website_domain
+      - case2_leaders (placeholder list)
+      - google_place_id, google_maps_uri
+      - source fields
+    """
     _load_dotenv_if_present()  # ✅ allow .env
 
     api_key = os.getenv("GOOGLE_PLACES_API_KEY", "").strip()
@@ -155,7 +175,6 @@ def scrape_google_places(
             "places.id,"
             "places.displayName,"
             "places.formattedAddress,"
-            "places.nationalPhoneNumber,"
             "places.websiteUri,"
             "places.types,"
             "places.rating,"
@@ -218,42 +237,38 @@ def scrape_google_places(
             dn = p.get("displayName") or {}
             name = (dn.get("text") if isinstance(dn, dict) else str(dn)).strip()
 
-            addr = (p.get("formattedAddress") or "").strip()
-            phone = (p.get("nationalPhoneNumber") or "").strip()
-            website = (p.get("websiteUri") or "").strip()
-
             # ✅ Case-2 base fields
+            website = (p.get("websiteUri") or "").strip()
             rating_val = _safe_float(p.get("rating"))
             count_val = _safe_int(p.get("userRatingCount"))
             has_website = bool(website)
+            website_domain = _get_domain(website)
 
             types = p.get("types") or []
             raw_cat = str(types[0]) if isinstance(types, list) and types else ""
 
-            # ✅ cleaner source link
             maps_uri = (p.get("googleMapsUri") or "").strip()
             source_url = maps_uri or (f"https://www.google.com/maps/place/?q=place_id:{pid}" if pid else "")
 
+            # ✅ Excel-friendly record (one row per company)
             out.append(
                 {
-                    # Basic identity
-                    "name": name,
-                    "raw_category": raw_cat,
-                    "address": addr,
-                    "phone": phone,
-                    "email": "",
-                    "website": website,
+                    "company_name": name,
+                    "industry": raw_cat,
 
-                    # ✅ Case-2 base support
-                    "has_website": has_website,
                     "google_rating": rating_val,
                     "google_rating_count": count_val,
 
-                    # ✅ important for future deep-dive mapping
+                    "has_website": has_website,
+                    "website_url": website,
+                    "website_domain": website_domain,
+
+                    # placeholder for Case-2 agent output
+                    "case2_leaders": [],  # list of {"name": "...", "designation": "..."}
+
                     "google_place_id": pid,
                     "google_maps_uri": maps_uri,
 
-                    # Source fields
                     "source_name": "google_places",
                     "source_url": source_url,
                 }

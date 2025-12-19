@@ -1,240 +1,207 @@
 # backend/agent_logic_case2.py
+# Case-2 — Website Top-Level Management (Top 5 leaders)
+# ✅ Names + Designation ONLY
+# ✅ No role-buckets, no email/phone/LinkedIn
+# ✅ Works with scraper_case2.py (returns leaders)
+# ✅ Adds time guards to prevent hanging
+
 from __future__ import annotations
 
+from typing import Any, Dict, List, Tuple
 import re
-from typing import Any, Dict, List, Optional, Tuple
+import os
+import time
 
 from backend.scraper_case2 import scrape_management_from_website
-
-# -----------------------------
-# Fixed 5 buckets (as decided)
-# -----------------------------
-BUCKETS = [
-    "Executive Leadership",
-    "Technology / Operations",
-    "Finance / Administration",
-    "Business Development / Growth",
-    "Marketing / Branding",
-]
-
-FIELDS = ["name", "designation", "email", "phone", "linkedin"]
+from backend.config import CASE2_MAX_LEADERS, CASE2_TIMEOUT_SECS
 
 
 # -----------------------------
-# Keyword signals for buckets
+# Helpers
 # -----------------------------
-EXEC_KW = [
-    "ceo", "chief executive", "founder", "co-founder", "cofounder",
-    "chairman", "chairperson", "president", "managing director", "md",
-    "director", "board", "trustee", "principal", "dean", "vice chancellor",
-    "vc", "owner", "partner",
-]
-
-TECHOPS_KW = [
-    "cto", "chief technology", "chief information", "cio",
-    "engineering", "engineer", "tech", "technology",
-    "operations", "ops", "plant", "production", "manufacturing",
-    "quality", "qa", "delivery", "project", "program", "it manager",
-    "head of operations", "operations manager", "service delivery",
-]
-
-FINADMIN_KW = [
-    "cfo", "finance", "accounts", "accounting", "controller",
-    "admin", "administration", "hr", "human resources",
-    "legal", "compliance", "procurement", "purchase", "office",
-]
-
-BIZGROWTH_KW = [
-    "business development", "bd", "growth", "sales", "partnership",
-    "partnerships", "alliances", "revenue", "client", "accounts manager",
-    "key account", "account manager", "commercial", "strategy",
-]
-
-MKTBRAND_KW = [
-    "marketing", "brand", "branding", "communications", "comm",
-    "public relations", "pr", "digital", "social", "content",
-    "community", "campaign", "creative",
-]
-
-LINKEDIN_RE = re.compile(r"(linkedin\.com/in/|linkedin\.com/company/)", re.I)
+def _norm(x: Any) -> str:
+    return re.sub(r"\s+", " ", ("" if x is None else str(x)).strip())
 
 
-def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", (s or "").strip()).lower()
+def _has_contact_noise(s: str) -> bool:
+    t = (s or "").lower()
+    if "@" in t:
+        return True
+    if re.search(r"\+?\d[\d\-\s]{7,}", t):
+        return True
+    if "linkedin" in t or "facebook" in t or "instagram" in t or "twitter" in t:
+        return True
+    return False
 
 
-def _looks_like_name(s: str) -> bool:
-    """Very light heuristic: 2+ words, not too long, no URL-ish text."""
-    t = (s or "").strip()
-    if not t:
-        return False
-    if "http" in t.lower() or "www." in t.lower():
-        return False
-    parts = [p for p in re.split(r"\s+", t) if p]
-    if len(parts) < 2:
-        return False
-    if len(t) > 60:
-        return False
-    return True
+def _clean_person(p: Any) -> Dict[str, str]:
+    """
+    Enforce strict output:
+      {"name": "...", "designation": "..."}
+    """
+    if not isinstance(p, dict):
+        return {"name": "", "designation": ""}
+
+    name = _norm(p.get("name", ""))
+    designation = _norm(p.get("designation", ""))
+
+    # STRICT: no contacts
+    if _has_contact_noise(name) or _has_contact_noise(designation):
+        return {"name": "", "designation": ""}
+
+    # name must exist
+    if not name:
+        return {"name": "", "designation": ""}
+
+    return {"name": name, "designation": designation}
 
 
-def _dedupe_people(people: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    """Deduplicate by (name + designation) mostly."""
+def _dedupe_leaders(items: List[Dict[str, str]]) -> List[Dict[str, str]]:
     seen = set()
     out: List[Dict[str, str]] = []
-    for p in people:
-        name = _norm(p.get("name", ""))
-        desig = _norm(p.get("designation", ""))
+    for p in items:
+        name = _norm(p.get("name", "")).lower()
+        des = _norm(p.get("designation", "")).lower()
         if not name:
             continue
-        key = (name, desig)
+        key = (name, des)
         if key in seen:
             continue
         seen.add(key)
-        out.append(p)
+        out.append({"name": _norm(p.get("name", "")), "designation": _norm(p.get("designation", ""))})
     return out
 
 
-def _score_for_keywords(text: str, keywords: List[str]) -> int:
-    t = _norm(text)
-    score = 0
-    for kw in keywords:
-        if kw in t:
-            score += 3
-    return score
-
-
-def _bucket_scores(person: Dict[str, str]) -> Dict[str, int]:
+def _leaders_to_excel_cols(leaders: List[Dict[str, str]], max_leaders: int = 5) -> Dict[str, str]:
     """
-    Score a person for each bucket using name/designation/source text.
-    Note: designation may be empty in v1 extraction; we still score based on any hints.
+    Convert leaders list -> flat Excel columns:
+      Leader 1 Name, Leader 1 Designation, ... Leader 5 Name, Leader 5 Designation
     """
-    name = person.get("name", "") or ""
-    desig = person.get("designation", "") or ""
-    src = person.get("source", "") or ""
-    text = f"{name} {desig} {src}"
+    n = max(1, min(int(max_leaders), 5))
+    out: Dict[str, str] = {}
+    for i in range(1, n + 1):
+        out[f"Leader {i} Name"] = ""
+        out[f"Leader {i} Designation"] = ""
 
-    scores = {
-        "Executive Leadership": _score_for_keywords(text, EXEC_KW),
-        "Technology / Operations": _score_for_keywords(text, TECHOPS_KW),
-        "Finance / Administration": _score_for_keywords(text, FINADMIN_KW),
-        "Business Development / Growth": _score_for_keywords(text, BIZGROWTH_KW),
-        "Marketing / Branding": _score_for_keywords(text, MKTBRAND_KW),
-    }
+    for idx, p in enumerate(leaders[:n], start=1):
+        out[f"Leader {idx} Name"] = _norm(p.get("name", ""))
+        out[f"Leader {idx} Designation"] = _norm(p.get("designation", ""))
 
-    # small boosts
-    if person.get("linkedin") and LINKEDIN_RE.search(person["linkedin"]):
-        for b in scores:
-            scores[b] += 1
-    if person.get("email"):
-        for b in scores:
-            scores[b] += 1
-
-    return scores
+    return out
 
 
-def _pick_best_for_bucket(people: List[Dict[str, str]], bucket: str) -> Dict[str, str]:
+# -----------------------------
+# Core API
+# -----------------------------
+def run_case2_top_management(
+    website: str,
+    max_leaders: int | None = None,
+    debug_hint: str = "",
+) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
     """
-    Picks one best candidate for a bucket.
-    If nothing decent, returns blank fields (allowed).
-    """
-    best: Optional[Dict[str, str]] = None
-    best_score = -1
-
-    for p in people:
-        if not _looks_like_name(p.get("name", "")):
-            continue
-        scores = _bucket_scores(p)
-        score = scores.get(bucket, 0)
-
-        # extra: if designation is present and matches bucket strongly
-        if bucket == "Executive Leadership":
-            score += 2 * _score_for_keywords(p.get("designation", ""), EXEC_KW)
-        elif bucket == "Technology / Operations":
-            score += 2 * _score_for_keywords(p.get("designation", ""), TECHOPS_KW)
-        elif bucket == "Finance / Administration":
-            score += 2 * _score_for_keywords(p.get("designation", ""), FINADMIN_KW)
-        elif bucket == "Business Development / Growth":
-            score += 2 * _score_for_keywords(p.get("designation", ""), BIZGROWTH_KW)
-        elif bucket == "Marketing / Branding":
-            score += 2 * _score_for_keywords(p.get("designation", ""), MKTBRAND_KW)
-
-        if score > best_score:
-            best_score = score
-            best = p
-
-    # threshold: if best score is too low, keep blank (avoid hallucinating)
-    if best is None or best_score <= 1:
-        return {k: "" for k in FIELDS}
-
-    # keep only public fields (already public-only pipeline)
-    return {
-        "name": best.get("name", "") or "",
-        "designation": best.get("designation", "") or "",
-        "email": best.get("email", "") or "",
-        "phone": best.get("phone", "") or "",
-        "linkedin": best.get("linkedin", "") or "",
-    }
-
-
-def run_case2_management_from_website(website: str) -> Tuple[Dict[str, Dict[str, str]], Dict[str, Any]]:
-    """
-    Main Case-2 function:
-      website -> scrape people -> dedupe -> pick best per bucket
+    website -> scrape -> return top leaders
 
     Returns:
-      (management_by_bucket, debug_meta)
+      (leaders_list, meta)
+
+    leaders_list:
+      [
+        {"name": "...", "designation": "..."},
+        ... up to max_leaders
+      ]
     """
-    meta: Dict[str, Any] = {"website": website, "count_scraped": 0, "count_after_dedupe": 0}
+
+    n = int(max_leaders or CASE2_MAX_LEADERS)
+    n = max(1, min(n, 5))
+
+    meta: Dict[str, Any] = {
+        "website": _norm(website),
+        "count_scraped": 0,
+        "max_leaders": n,
+        "hint": _norm(debug_hint),
+    }
 
     if not website or not isinstance(website, str):
-        return ({b: {k: "" for k in FIELDS} for b in BUCKETS}, meta)
+        return ([], meta)
 
     website = website.strip()
     if not (website.startswith("http://") or website.startswith("https://")):
         website = "https://" + website
 
-    people = scrape_management_from_website(website) or []
+    # ✅ Per-website guard: don't let one org eat too much time
+    # You can override with env: CASE2_PER_SITE_TIMEOUT_SECS
+    per_site_cap = int(os.getenv("CASE2_PER_SITE_TIMEOUT_SECS", str(max(10, CASE2_TIMEOUT_SECS * 2))))
+    per_site_cap = max(10, min(per_site_cap, 90))
+
+    t0 = time.time()
+    people = scrape_management_from_website(website, max_leaders=n) or []
+    elapsed = time.time() - t0
+
+    meta["elapsed_secs"] = round(elapsed, 2)
+    meta["per_site_cap_secs"] = per_site_cap
+
+    # If scraping took too long, still return whatever we got (no crash)
+    # (scraper itself uses request timeouts; this is just a safety meta)
     meta["count_scraped"] = len(people)
 
-    people = _dedupe_people(people)
-    meta["count_after_dedupe"] = len(people)
+    leaders: List[Dict[str, str]] = []
+    for p in people:
+        cp = _clean_person(p)
+        if not cp["name"]:
+            continue
+        leaders.append(cp)
+        if len(leaders) >= n:
+            break
 
-    management: Dict[str, Dict[str, str]] = {}
-    for bucket in BUCKETS:
-        management[bucket] = _pick_best_for_bucket(people, bucket)
-
-    return management, meta
+    leaders = _dedupe_leaders(leaders)[:n]
+    return (leaders, meta)
 
 
 def enrich_company_record_with_case2(record: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Takes a single company record (from Case-1 results),
-    reads website field, and attaches:
-      record["case2_management"] = {bucket: {fields...}}
-      record["case2_meta"] = {...}
+    Mutates and returns record:
+      record["case2_leaders"] = [{"name":..,"designation":..}, ... up to 5]
+      record["case2_meta"]    = {...}
+      record["Leader 1 Name"], "Leader 1 Designation", ... (flat Excel columns)
     """
-    # tolerate different key styles
+    if not isinstance(record, dict):
+        return record
+
     website = (
-        record.get("Website")
+        record.get("Website URL")
+        or record.get("website_url")
+        or record.get("Website")
         or record.get("website")
-        or record.get("Has Website")  # sometimes boolean-like; ignore if not URL
         or ""
     )
+    website = _norm(website)
 
-    # If Has Website is boolean and Website is empty -> keep blank
-    if isinstance(website, bool):
-        website = ""
+    hint = " ".join(
+        [
+            _norm(record.get("Company Name") or record.get("Name") or record.get("company_name") or ""),
+            _norm(record.get("Industry") or record.get("Primary Category") or record.get("industry") or ""),
+        ]
+    ).strip()
 
-    management, meta = run_case2_management_from_website(str(website) if website else "")
-    record["case2_management"] = management
+    leaders, meta = run_case2_top_management(
+        website=website,
+        max_leaders=int(CASE2_MAX_LEADERS),
+        debug_hint=hint,
+    )
+
+    # attach list + meta
+    record["case2_leaders"] = leaders
     record["case2_meta"] = meta
+
+    # ✅ attach flat Excel columns (super important)
+    flat = _leaders_to_excel_cols(leaders, max_leaders=int(CASE2_MAX_LEADERS))
+    record.update(flat)
+
     return record
 
 
 if __name__ == "__main__":
-    # Quick manual test (optional)
-    mgmt, meta = run_case2_management_from_website("https://www.tcs.com")
+    leaders, meta = run_case2_top_management("https://www.tcs.com", max_leaders=5, debug_hint="company")
     print(meta)
-    for b in BUCKETS:
-        print(b, "=>", mgmt[b])
+    for x in leaders:
+        print(x)
