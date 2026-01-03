@@ -1,17 +1,41 @@
+# backend/gpt_client.py
 from __future__ import annotations
 
 import re
 import json
 import asyncio
 from typing import List, Dict, Any, Optional
+import torch
 
-from backend.config import OPENAI_API_KEY
-
-# OpenAI is optional at runtime (must not crash project if missing)
+# ✅ Flexible imports (works from anywhere)
 try:
-    from openai import OpenAI  # type: ignore
-except Exception:  # pragma: no cover
-    OpenAI = None  # type: ignore
+    from backend.config import (
+        HUGGINGFACE_TOKEN,
+        HF_MODEL_NAME,
+        USE_4BIT_QUANTIZATION,
+        MAX_NEW_TOKENS,
+        LLM_TEMPERATURE,
+        FORCE_CPU
+    )
+except ImportError:
+    from config import (
+        HUGGINGFACE_TOKEN,
+        HF_MODEL_NAME,
+        USE_4BIT_QUANTIZATION,
+        MAX_NEW_TOKENS,
+        LLM_TEMPERATURE,
+        FORCE_CPU
+    )
+
+# Hugging Face imports
+try:
+    from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+    HF_AVAILABLE = True
+except Exception:
+    HF_AVAILABLE = False
+    AutoTokenizer = None
+    AutoModelForCausalLM = None
+    BitsAndBytesConfig = None
 
 
 # -----------------------------
@@ -28,6 +52,27 @@ def _safe_json_load(s: str) -> Any:
         return json.loads(s)
     except Exception:
         return None
+
+
+def _extract_json_from_text(text: str) -> Any:
+    """Extract JSON from LLM response (handles markdown code blocks)"""
+    text = text.strip()
+    
+    # Remove markdown code blocks
+    text = re.sub(r'^```json\s*', '', text)
+    text = re.sub(r'^```\s*', '', text)
+    text = re.sub(r'\s*```$', '', text)
+    
+    # Try to find JSON object
+    json_match = re.search(r'\{.*\}', text, re.DOTALL)
+    if json_match:
+        try:
+            return json.loads(json_match.group())
+        except:
+            pass
+    
+    # Fallback: try parsing whole text
+    return _safe_json_load(text)
 
 
 def _clean_leaders(obj: Any, max_leaders: int = 5) -> List[Dict[str, str]]:
@@ -71,89 +116,129 @@ def _clean_leaders(obj: Any, max_leaders: int = 5) -> List[Dict[str, str]]:
     return out
 
 
-def _should_disable_for_error(e: Exception) -> bool:
-    """
-    If quota/billing/auth related, we should not spam or crash.
-    Treat 401/403/429 and "insufficient_quota" as disable conditions.
-    """
-    msg = (str(e) or "").lower()
-
-    if "insufficient_quota" in msg or "exceeded your current quota" in msg:
-        return True
-
-    # auth / billing / permission
-    if "invalid api key" in msg or "incorrect api key" in msg or "unauthorized" in msg:
-        return True
-    if "billing" in msg and ("required" in msg or "details" in msg or "account" in msg):
-        return True
-    if "permission" in msg and "denied" in msg:
-        return True
-
-    # status-code heuristics (string-based + attr-based)
-    if "error code: 401" in msg or "401" in msg and "auth" in msg:
-        return True
-    if "error code: 403" in msg or "403" in msg and "permission" in msg:
-        return True
-    if "error code: 429" in msg or ("429" in msg and ("quota" in msg or "rate" in msg or "limit" in msg)):
-        return True
-
-    status = getattr(e, "status_code", None)
-    try:
-        status_i = int(status) if status is not None else None
-    except Exception:
-        status_i = None
-
-    if status_i in (401, 403, 429):
-        return True
-
-    return False
-
-
 # ---------------------------------------------------------
-# OpenAI-backed client (keeps class name for compatibility)
+# Hugging Face LLM Client
 # ---------------------------------------------------------
 class GeminiClient:
     """
-    Backward-compatible client wrapper.
-    Previously Gemini-based; now uses OpenAI (if enabled).
-    MUST NOT crash if key/quota missing.
+    🤖 Hugging Face LLM Client (replacing OpenAI/Gemini)
+    Backward-compatible class name for existing code.
     """
 
     def __init__(self) -> None:
-        self.model_id: str = "gpt-4o-mini"
+        self.model_name: str = HF_MODEL_NAME
         self._disabled: bool = False
-        self.client: Any = None  # lazily created
+        self.device = "cpu" if FORCE_CPU else ("cuda" if torch.cuda.is_available() else "cpu")
+        self.tokenizer: Any = None
+        self.model: Any = None
+        
+        print(f"🤖 LLM Client initializing...")
+        print(f"📦 Model: {self.model_name}")
+        print(f"💻 Device: {self.device}")
 
     def is_enabled(self) -> bool:
+        """Check if Hugging Face is available and configured"""
         if self._disabled:
             return False
-        key = (OPENAI_API_KEY or "").strip()
-        if not key:
+        if not HF_AVAILABLE:
+            print("❌ Transformers library not available")
             return False
-        if OpenAI is None:
+        if not HUGGINGFACE_TOKEN:
+            print("❌ Hugging Face token not configured")
             return False
         return True
 
-    def _ensure_client(self) -> Optional[Any]:
+    def _ensure_model(self) -> bool:
+        """Lazy load model only when needed"""
         if not self.is_enabled():
-            return None
-        if self.client is not None:
-            return self.client
+            return False
+        
+        if self.model is not None and self.tokenizer is not None:
+            return True
+
         try:
-            self.client = OpenAI(api_key=(OPENAI_API_KEY or "").strip())  # type: ignore[misc]
-            return self.client
-        except Exception:
-            self.client = None
-            return None
+            print(f"📥 Loading model: {self.model_name}...")
+            
+            # Setup quantization config
+            quantization_config = None
+            if USE_4BIT_QUANTIZATION and self.device == "cuda":
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.float16,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4"
+                )
+            
+            # Load tokenizer
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.model_name,
+                token=HUGGINGFACE_TOKEN,
+                trust_remote_code=True
+            )
+            
+            # Load model
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_name,
+                token=HUGGINGFACE_TOKEN,
+                quantization_config=quantization_config,
+                device_map="auto" if self.device == "cuda" else None,
+                trust_remote_code=True,
+                torch_dtype=torch.float16 if self.device == "cuda" else torch.float32
+            )
+            
+            if self.device == "cpu":
+                self.model = self.model.to("cpu")
+            
+            print(f"✅ Model loaded successfully on {self.device}!")
+            return True
+            
+        except Exception as e:
+            print(f"❌ Failed to load model: {e}")
+            self._disabled = True
+            self.model = None
+            self.tokenizer = None
+            return False
+
+    def _generate_response(self, prompt: str, max_tokens: int = None) -> str:
+        """Generate response from LLM"""
+        if not self._ensure_model():
+            return "{}"
+        
+        if max_tokens is None:
+            max_tokens = MAX_NEW_TOKENS
+
+        try:
+            inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=2048)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    **inputs,
+                    max_new_tokens=max_tokens,
+                    temperature=LLM_TEMPERATURE,
+                    do_sample=True,
+                    top_p=0.9,
+                    repetition_penalty=1.2,
+                    pad_token_id=self.tokenizer.eos_token_id
+                )
+            
+            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # Remove prompt from response
+            response = response.replace(prompt, "").strip()
+            
+            return response
+            
+        except Exception as e:
+            print(f"❌ Generation error: {e}")
+            return "{}"
 
     async def discovery_search_async(self, company_name: str, website: str) -> List[Dict[str, str]]:
         """
-        LLM-only leadership extraction (no website scraping here).
+        LLM-only leadership extraction.
         Returns: [{"name":"...","role":"..."}]
-        Never raises.
         """
-        client = self._ensure_client()
-        if client is None:
+        if not self._ensure_model():
             return []
 
         company_name = _norm(company_name) or "this company"
@@ -161,8 +246,33 @@ class GeminiClient:
         if not website:
             return []
 
-        prompt = f"""
-Extract current top management of the company.
+        # Prompt template (varies by model)
+        # For Llama-2
+        if "llama" in self.model_name.lower():
+            prompt = f"""[INST] You are an expert at extracting leadership information.
+
+Task: Extract current top management of the company.
+
+Company: {company_name}
+Website: {website}
+
+Return ONLY valid JSON with this exact format:
+{{
+  "leaders": [
+    {{ "name": "Full Name", "role": "CEO" }}
+  ]
+}}
+
+Rules:
+- Maximum 5 leaders
+- Focus on: CEO, Founder, Co-Founder, Managing Director, Director, CTO, COO, CFO
+- If no information available, return: {{ "leaders": [] }}
+- No markdown, no explanations, only JSON
+
+[/INST]"""
+        else:
+            # Generic prompt
+            prompt = f"""Extract current top management of the company.
 
 Company: {company_name}
 Website: {website}
@@ -178,53 +288,57 @@ Rules:
 - Max 5
 - Focus on CEO, Founder, Co-Founder, Managing Director, Director, CTO, COO, CFO
 - If unsure, return {{ "leaders": [] }}
-""".strip()
+"""
 
         try:
-            def _call():
-                return client.chat.completions.create(
-                    model=self.model_id,
-                    messages=[
-                        {"role": "system", "content": "Return valid JSON only. No markdown."},
-                        {"role": "user", "content": prompt},
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=0.2,
-                )
-
-            resp = await asyncio.to_thread(_call)
-            text = (resp.choices[0].message.content or "{}").strip()
-            data = _safe_json_load(text) or {}
+            # Run in thread to avoid blocking
+            response = await asyncio.to_thread(self._generate_response, prompt, 300)
+            
+            data = _extract_json_from_text(response)
+            if not data:
+                return []
+            
             return _clean_leaders(data, max_leaders=5)
 
         except Exception as e:
-            if _should_disable_for_error(e):
-                self._disabled = True
-                return []
+            print(f"❌ Discovery search error: {e}")
             return []
 
     def clean_leadership_data(self, raw_data: List[Dict[str, str]]) -> List[Dict[str, str]]:
         """
-        OPTIONAL LLM cleaning: remove junk/menu items/slogans and normalize roles.
-        Input: list of dicts
-        Output: list of dicts [{"name","role"}]
-        Never raises.
+        LLM cleaning: remove junk/menu items and normalize roles.
         """
         if not raw_data:
             return []
 
-        client = self._ensure_client()
-        if client is None:
+        if not self._ensure_model():
             return raw_data[:5]
 
-        prompt = f"""
-Clean and normalize this leadership list.
+        if "llama" in self.model_name.lower():
+            prompt = f"""[INST] Clean and normalize this leadership list.
 
 Rules:
-- Remove navigation/menu items, slogans, page headings, locations, departments.
-- Keep only real people.
-- Ensure each item has "name" and "role".
-- Max 5.
+- Remove navigation/menu items, slogans, page headings, locations, departments
+- Keep only real people with proper names and roles
+- Ensure each item has "name" and "role"
+- Maximum 5 entries
+
+Return ONLY valid JSON:
+{{
+  "leaders": [
+    {{ "name": "Full Name", "role": "Role/Title" }}
+  ]
+}}
+
+Data to clean:
+{json.dumps(raw_data, ensure_ascii=False)}
+
+[/INST]"""
+        else:
+            prompt = f"""Clean this leadership list. Remove junk, keep only real people.
+
+Data:
+{json.dumps(raw_data, ensure_ascii=False)}
 
 Return ONLY JSON:
 {{
@@ -232,30 +346,20 @@ Return ONLY JSON:
     {{ "name": "Full Name", "role": "Role/Title" }}
   ]
 }}
-
-Data:
-{json.dumps(raw_data, ensure_ascii=False)}
-""".strip()
+"""
 
         try:
-            resp = client.chat.completions.create(
-                model=self.model_id,
-                messages=[
-                    {"role": "system", "content": "Return valid JSON only. No markdown."},
-                    {"role": "user", "content": prompt},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.2,
-            )
-            text = (resp.choices[0].message.content or "{}").strip()
-            data = _safe_json_load(text) or {}
+            response = self._generate_response(prompt, 300)
+            data = _extract_json_from_text(response)
+            
+            if not data:
+                return raw_data[:5]
+            
             cleaned = _clean_leaders(data, max_leaders=5)
-            return cleaned or raw_data[:5]
+            return cleaned if cleaned else raw_data[:5]
 
         except Exception as e:
-            if _should_disable_for_error(e):
-                self._disabled = True
-                return raw_data[:5]
+            print(f"❌ Cleaning error: {e}")
             return raw_data[:5]
 
     def normalize_top_level_management(self, raw_title: str) -> str:

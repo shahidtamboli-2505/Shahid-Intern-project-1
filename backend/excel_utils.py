@@ -104,6 +104,10 @@ def _flatten_case2_management_to_names(case2_management: Any) -> Dict[str, str]:
     """
     Convert bucket dict -> Name 1..5, Designation 1..5 (strict order).
     Accepts dict or json-string.
+
+    ✅ FIXED:
+    - If name exists but designation missing, still fill (designation blank allowed).
+    - designation fallback from role.
     """
     out: Dict[str, str] = {}
     for i in range(1, 6):
@@ -118,12 +122,16 @@ def _flatten_case2_management_to_names(case2_management: Any) -> Dict[str, str]:
     for bucket in BUCKETS_ORDER:
         if idx > 5:
             break
+
         v = mgmt.get(bucket) or {}
         if not isinstance(v, dict):
             continue
+
         nm = _norm(v.get("name", ""))
-        dg = _norm(v.get("designation", v.get("role", "")))
-        if nm and dg:
+        dg = _norm(v.get("designation", "")) or _norm(v.get("role", ""))
+
+        # ✅ name-only allowed
+        if nm:
             out[f"Name {idx}"] = nm
             out[f"Designation {idx}"] = dg
             idx += 1
@@ -134,6 +142,7 @@ def _flatten_case2_management_to_names(case2_management: Any) -> Dict[str, str]:
 def _flatten_case2_leaders_legacy(case2_leaders: Any) -> Dict[str, str]:
     """
     Legacy support: case2_leaders = [{name, role}, ...]
+    ✅ Also supports designation key.
     """
     out: Dict[str, str] = {}
     for i in range(1, 6):
@@ -148,7 +157,9 @@ def _flatten_case2_leaders_legacy(case2_leaders: Any) -> Dict[str, str]:
         idx = i - 1
         if idx < len(leaders) and isinstance(leaders[idx], dict):
             out[f"Name {i}"] = _norm(leaders[idx].get("name", ""))
-            out[f"Designation {i}"] = _norm(leaders[idx].get("role", ""))
+            out[f"Designation {i}"] = _norm(
+                leaders[idx].get("role", leaders[idx].get("designation", ""))
+            )
     return out
 
 
@@ -185,8 +196,8 @@ def _build_excel_row(row: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     # ---------------------------------------------------------
-    # Leaders priority (MOST IMPORTANT for your new pipeline)
-    # 1) If miner already set Name/Designation 1..5 -> use them
+    # Leaders priority
+    # 1) If row already has Name/Designation 1..5 -> use them
     # 2) else if case2_management exists -> flatten buckets
     # 3) else legacy case2_leaders list
     # ---------------------------------------------------------
@@ -203,27 +214,24 @@ def _build_excel_row(row: Dict[str, Any]) -> Dict[str, Any]:
             out[f"Name {i}"] = _norm(row.get(f"Name {i}", ""))
             out[f"Designation {i}"] = _norm(row.get(f"Designation {i}", ""))
     else:
-        # try case2_management (new)
         flat_from_mgmt = _flatten_case2_management_to_names(row.get("case2_management"))
         if any(flat_from_mgmt.get(f"Name {i}") for i in range(1, 6)):
             for i in range(1, 6):
                 out[f"Name {i}"] = flat_from_mgmt.get(f"Name {i}", "")
                 out[f"Designation {i}"] = flat_from_mgmt.get(f"Designation {i}", "")
         else:
-            # legacy support
             flat_legacy = _flatten_case2_leaders_legacy(row.get("case2_leaders"))
             for i in range(1, 6):
                 out[f"Name {i}"] = flat_legacy.get(f"Name {i}", "")
                 out[f"Designation {i}"] = flat_legacy.get(f"Designation {i}", "")
 
     # Leadership Found:
-    # - if pipeline already set strict flag, use it
-    # - else compute from Name1+Designation1
     lf = _norm(row.get("Leadership Found", ""))
     if lf in {"Yes", "No"}:
         out["Leadership Found"] = lf
     else:
-        out["Leadership Found"] = "Yes" if out["Name 1"] and out["Designation 1"] else "No"
+        # ✅ FIX: if ANY Name i exists -> Yes
+        out["Leadership Found"] = "Yes" if any(_norm(out.get(f"Name {i}", "")) for i in range(1, 6)) else "No"
 
     return out
 

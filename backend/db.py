@@ -651,3 +651,59 @@ def add_search_history(query: str) -> None:
     )
     conn.commit()
     conn.close()
+# --- 💡 NEW: FLAT LEADERSHIP TABLE SAVE ---
+
+def save_leaders_to_db(conn: sqlite3.Connection, company_url: str, leaders: List[Any]):
+    """
+    Saves leaders to a flat leadership table. 
+    Added to support specific Case-2 extraction tracking.
+    """
+    cursor = conn.cursor()
+    
+    # Create flat table if not exists (Aligned with your required schema)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS leadership (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_url TEXT,
+            name TEXT,
+            role TEXT,
+            category TEXT,
+            confidence REAL,
+            source_url TEXT,
+            method TEXT,
+            scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Insert leaders from the scraper candidates
+    for leader in leaders:
+        # Check if leader is an object (LeaderCandidate) or dict
+        if hasattr(leader, 'name'):
+            nm, rl, conf, src, meth = leader.name, leader.role, leader.confidence, leader.source_url, getattr(leader, 'method', 'scrape')
+        else:
+            nm = leader.get('name', '')
+            rl = leader.get('role', '')
+            conf = leader.get('confidence', 0.0)
+            src = leader.get('source_url', company_url)
+            meth = leader.get('method', 'scrape')
+
+        # Auto-map category based on role for the flat table
+        cat = _map_role_to_bucket(rl) or "Executive Leadership"
+
+        cursor.execute('''
+            INSERT INTO leadership (company_url, name, role, category, confidence, source_url, method)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            _ensure_url(company_url),
+            _norm_text(nm),
+            _norm_text(rl),
+            cat,
+            conf,
+            _ensure_url(src),
+            meth
+        ))
+    
+    conn.commit()
+    print(f"✅ Saved {len(leaders)} leaders to flat leadership table")
+
+# ------------------------------------------------------------
